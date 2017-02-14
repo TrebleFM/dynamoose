@@ -1,16 +1,8 @@
 {
-  "name": "dynamoose",
+  "name": "@treblefm/dynamoose",
   "version": "0.7.0",
   "description": "Dynamoose is a modeling tool for Amazon's DynamoDB (inspired by Mongoose)",
-  "homepage": "https://github.com/automategreen/dynamoose",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/automategreen/dynamoose"
-  },
-  "bugs": {
-    "email": "support@automategreen.com",
-    "url": "https://github.com/automategreen/dynamoose/issues"
-  },
+  "homepage": "https://github.com/TrebleFM/dynamoose",
   "main": "index.js",
   "scripts": {
     "test": "grunt test"
@@ -35,19 +27,19 @@
   "author": "Brandon Goode <brandon@automategreen.com>",
   "license": "MIT",
   "devDependencies": {
-    "mocha": "*",
-    "should": "*",
+    "blanket": "^1.2.3",
     "grunt": "*",
     "grunt-contrib-jshint": "*",
     "grunt-mocha-test": "*",
-    "blanket": "1.1.5",
+    "mocha": "*",
+    "should": "*",
     "travis-cov": "*"
   },
   "dependencies": {
-    "debug": "*",
     "aws-sdk": "^2.1.0",
-    "q": "~1.0.1",
+    "debug": "*",
     "hooks": "0.3.2",
+    "q": "^1.4.1",
     "underscore": "^1.8.3"
   }
 }
