@@ -1,0 +1,7 @@
+{
+    "extends": "@treblefm/eslint-config/test",
+    "rules": {
+        "node/no-unsupported-features": 0,
+        "sort-imports": 0
+    }
+}
