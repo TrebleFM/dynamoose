@@ -38,15 +38,15 @@
     "eslint-plugin-babel": "^4.0.1",
     "eslint-plugin-flowtype": "^2.30.0",
     "eslint-plugin-node": "^4.0.1",
-    "grunt": "*",
-    "grunt-mocha-test": "*",
-    "mocha": "*",
-    "should": "*",
-    "travis-cov": "*"
+    "grunt": "^1.0.1",
+    "grunt-mocha-test": "^0.13.2",
+    "mocha": "^3.2.0",
+    "should": "^11.2.0",
+    "travis-cov": "^0.2.5"
   },
   "dependencies": {
     "aws-sdk": "^2.1.0",
-    "debug": "*",
+    "debug": "^2.6.1",
     "extendable-error-class": "^0.1.1",
     "hooks": "0.3.2",
     "q": "^1.4.1",
