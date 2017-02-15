@@ -1,12 +1,5 @@
 .DS_Store
-thumbs.db
-*.log
-node_modules/
-.settings
-.session.vim
+npm-debug.log
+node_modules
 coverage.html
-lib-cov/
-.vscode
-
-# Ignore webstorm directories
-.idea/
+lib-cov
