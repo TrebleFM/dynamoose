@@ -21,17 +21,22 @@ const dynamoose = require("../");
 
 // dynamoose.local(); // Use a local DynamoDB
 
+// Create cat model with default options
 const Cat = dynamoose.model("Cat", {
     id: Number,
     name: String
 });
 
+// Create a new cat object
 let garfield = new Cat({
     id: 1,
     name: "Garfield"
 });
+
+// Save to DynamoDB
 garfield.save();
 
+// Lookup in DynamoDB
 Cat.get(1)
     .then((badCat) => {
         console.log(`Never trust a smiling cat. - ${badCat.name}`);

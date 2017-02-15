@@ -1,5 +1,4 @@
-# Dynamoose [![Build Status](https://travis-ci.org/automategreen/dynamoose.png)](https://travis-ci.org/automategreen/dynamoose)
-
+# Dynamoose
 
 Dynamoose is a modeling tool for Amazon's DynamoDB (inspired by [Mongoose](http://mongoosejs.com/))
 
@@ -7,11 +6,37 @@ In switching from MongoDB/Mongoose to DynamoDB, we missed the modeling provided 
 
 Dynamoose uses the official [AWS SDK](https://github.com/aws/aws-sdk-js).
 
+## @treblefm/dynamoose vs dynamoose
+
+This package rewrote most of Dynamoose after it was determined that the original codebase wasn't of a high enough quality for us to feel comfortable using. While the vast majority of the API exposed by this package matches the original, it is **NOT** a drop-in replacement. In particular, tables built from Dynamoose models will not be compatible if they contain Booleans (unless `useNativeBooleans` was specified), Objects/Arrays (unless `useDocumentTypes`, an undocumented option, was specified), or if they contain Dates.
+
+Highlights of differences:
+- Dropped support for callbacks in favor of Promises (we also highly recommend [Bluebird](http://bluebirdjs.com/))
+  - If for some ~~sick~~ reason you prefer callbacks, you can use Bluebird's [`<Promise>.asCallback`](http://bluebirdjs.com/docs/api/ascallback.html) like so:
+
+    ```js
+    // Gross, old way
+    Cat.query({ /***/ }, function (err, results) {
+        // do things
+    });
+
+    // New hotness
+    Cat.query({ /***/ }).asCallback((err, results) => {
+        // do things
+    });
+    ```
+- Booleans are always stored as `BOOL` instead of `S`
+- Objects and arrays are always stored as `M` and `L`, respectively
+- Dates are stored as `S` instead of `N` in ISO-8601 format, to conform with the official DynamoDB high-level interfaces
+- Some smaller differences in behavior which shouldn't be a problem, but still count as breaking changes
+
 ## Getting Started
 
 ### Installation
 
-    $ npm install dynamoose
+```sh
+npm install --save @treblefm/dynamoose
+```
 
 ### Example
 
@@ -26,176 +51,247 @@ export AWS_REGION="us-east-1"
 Here's a simple example:
 
 ```js
-var dynamoose = require('dynamoose');
+const dynamoose = require("@treblefm/dynamoose");
+
+// dynamoose.local(); // Use a local DynamoDB
 
 // Create cat model with default options
-var Cat = dynamoose.model('Cat', { id: Number, name: String });
+const Cat = dynamoose.model("Cat", {
+    id: Number,
+    name: String
+});
 
 // Create a new cat object
-var garfield = new Cat({id: 666, name: 'Garfield'});
+let garfield = new Cat({
+    id: 1,
+    name: "Garfield"
+});
 
 // Save to DynamoDB
 garfield.save();
 
 // Lookup in DynamoDB
-Cat.get(666)
-.then(function (badCat) {
-  console.log('Never trust a smiling cat. - ' + badCat.name);
-});
+Cat.get(1)
+    .then((badCat) => {
+        console.log(`Never trust a smiling cat. - ${badCat.name}`);
+    });
 ```
 
-## Specifying AWS credentials
+### Specifying AWS credentials
 
 There are three ways to specify AWS credentials:
+- Environment variables (like in the example above)
+- `~/.aws/credentials`
+- `AWS.Config`
 
-### .aws/credentials
+See the `aws-sdk` documentation for more information.
 
-### Environment Variables
-
-### AWS.config
+------
 
 ## Dynamoose API
 
 ```js
-var dynamoose = require('dynamoose');
+const dynamoose = require("@treblefm/dynamoose");
 ```
 
-### dynamoose.model(name, schema, [options])
+### `dynamoose.model(name, schema, [options])`
 
-Compiles a new model or looks up an existing one. `options` is optional.
+Compiles a new model or looks up an existing one.
 
 Default `options`:
 
 ```js
 {
-  create: true, // Create table in DB, if it does not exist,
-  update: false, // Update remote indexes if they do not match local index structure
-  waitForActive: true, // Wait for table to be created before trying to use it
-  waitForActiveTimeout: 180000 // wait 3 minutes for table to activate
+    create: true, // Create table in DB, if it does not exist
+    update: false, // Update remote indexes if they do not match local index structure
+    waitForActive: true, // Wait for table to be created before trying to use it
+    waitForActiveTimeout: 3 * 60 * 1000, // wait 3 minutes for table to activate
 }
 ```
 
 Basic example:
 
 ```js
-var Cat = dynamoose.model('Cat', { id: Number, name: String });
+const Cat = dynamoose.model("Cat", {
+    id: Number,
+    name: String
+});
 ```
 
-### dynamoose.local(url)
+### `dynamoose.local(url)`
 
-Configure dynamoose to use a DynamoDB local for testing.
-
-`url` defaults to 'http://localhost:8000'
+Configure dynamoose to use a DynamoDB local for testing. `url` defaults to `http://localhost:8000`
 
 ```js
 dynamoose.local();
 ```
 
-### dynamoose.ddb()
+### `dynamoose.ddb()`
 
-Configures and returns the AWS.DynamoDB object
+Configures and returns the `AWS.DynamoDB` object
 
-### dynamoose.AWS
+### `dynamoose.setDefaults(options)`
 
-AWS object for dynamoose.  Used to configure AWS for dynamoose.
-
-```js
-dynamoose.AWS.config.update({
-  accessKeyId: 'AKID',
-  secretAccessKey: 'SECRET',
-  region: 'us-east-1'
-});
-```
-
-### dynamoose.setDefaults(options)
-
-Sets the default to be used when creating a model. Can be modified on a per model by passing options to `.model()`.
+Sets the default to be used when creating a model. Can be overridden on a per-model basis by passing options to `dynamoose.model`.
 
 Default `options`:
 
 ```js
 {
-  create: true // Create table in DB if it does not exist
+    create: true, // Create table in DB, if it does not exist
+    waitForActive: true, // Wait for table to be created before trying to use it
+    waitForActiveTimeout: 3 * 60 * 1000, // wait 3 minutes for table to activate
+    prefix: "" // Prefix for model/table names
 }
 ```
 
-It is recommended that `create` be disabled for production environments.
+The following options are recommended for production environments:
 
 ```js
-dynamoose.setDefaults( { create: false });
-```
-
-### dynamoose.Schema
-
-The dynamoose Schema class, used to create new schema definitions. For example:
-
-```js
-var appleSchema = new dynamoose.Schema({
-  id: Number, 
-  type: String
+dynamoose.setDefaults({
+    create: false,
+    prefix: `${process.env.NODE_ENV}-` // use prefixed tables for staging/production separation
 });
 ```
 
-### dynamoose.Table
+### `dynamoose.AWS`
 
-Table class
+`AWS` object for dynamoose. Used to configure AWS for dynamoose.
 
+```js
+dynamoose.AWS.config.update({
+    accessKeyId: 'AKID',
+    secretAccessKey: 'SECRET',
+    region: 'us-east-1'
+});
+```
 
-## Schemas
+### `dynamoose.Schema`
+
+The dynamoose `Schema` class, used to create new schema definitions. For example:
+
+```js
+const CatSchema = new dynamoose.Schema({
+    id: Number,
+    name: String
+});
+```
+
+### `dynamoose.Table`
+
+- TODO
+
+### `dynamoose.VirtualType`
+
+- TODO
+
+------
+
+## Schemas and Attributes
 
 Schemas are used to define DynamoDB table attributes and their constraints.
 
 ### Creating a new Schema
 
-Schemas are created using `new Schema(attrDefObj, options)`. 
+Schemas are created using `new Schema(schemaObj, options)`.
 
-The first argument (`attrDefObj`) is an object containing attribute definitions. Keys of this object correspond to attributes in the resulting DynamoDB table. The values of these keys define constraints on those attributes (as well as a few handy features...). See [Attribute Definitions](#attribute-definitions) for a more thorough description.
+The first argument (`schemaObj`) is an object containing attribute definitions. Keys of this object correspond to attributes in the resulting DynamoDB table. The values of these keys define constraints on those attributes (as well as a few handy features...). See [Attribute Definitions](#attribute-definitions) for a more thorough description.
 
 The second argument (`options`) defines options for the table that are beyond the scope of individual attributes. See [Schema Options](#schema-options) for more.
 
 The following is an example of creating a new Schema:
 
 ```js
-var Schema = dynamoose.Schema;
+const Schema = dynamoose.Schema;
 
-var dogSchema = new Schema({
-  ownerId: {
-    type: Number,
-    validate: function(v) { return v > 0; },
-    hashKey: true
-  },
-  name: {
-    type: String,
-    rangeKey: true,
-    index: true // name: nameLocalIndex, ProjectionType: ALL
-  },
-  breed: {
-    type: String,
-    trim: true,
-    required: true,
-    index: {
-      global: true,
-      rangeKey: 'ownerId',
-      name: 'BreedIndex',
-      project: true, // ProjectionType: ALL
-      throughput: 5 // read and write are both 5
+const DogSchema = new Schema({
+    ownerId: {
+        type: Number,
+        validate: (v) => v > 0,
+        hashKey: true
+    },
+    name: {
+        type: String,
+        rangeKey: true,
+        index: true // name: nameLocalIndex, ProjectionType: ALL
+    },
+    breed: {
+        type: String,
+        trim: true,
+        required: true,
+        index: {
+            global: true,
+            rangeKey: 'ownerId',
+            name: 'BreedIndex',
+            project: true, // ProjectionType: ALL
+            throughput: 5 // read and write are both 5
+        }
+    },
+    color: {
+        lowercase: true,
+        type: [String],
+        default: ['Brown']
+    },
+    age: Number
+}, {
+    throughput: {
+        read: 15,
+        write: 5
     }
-  },
-  color: {
-    lowercase: true,
-    type: [String],
-    default: ['Brown']
-  },
-  age: Number
-},
-{
-  throughput: {read: 15, write: 5}
+});
+```
+
+### Schema Options
+
+**throughput**: `Number` | `{ read: Number, write: Number }` (numbers must be intergers)
+
+Sets the throughput of the DynamoDB table. The value can either be a number or an object with the keys `read` and `write` (for example: `{ read: 5, write: 2 }`). If it is a number, both read and write are configured to that number. If it is omitted, the read and write values will be set to `1`.
+
+```js
+const schema = new Schema({
+    /***/
+}, {
+    throughput: 5
+});
+
+const schema = new Schema({
+    /***/
+}, {
+    throughput: {
+        read: 5,
+        write: 2
+    }
+});
+```
+
+**timestamps**: `Boolean` | `{ createdAt: String, updatedAt: String }`
+
+Creates two automatic `Date` attributes: one for when the item was created, the other for when it was last updated. If it is set to `true`, these attributes will be `createdAt` for creation date and `updatedAt` for last update. For example:
+
+```js
+const schema = new Schema({
+    /***/
+}, {
+    timestamps: true
+});
+```
+
+Also it is possible to specify the names the attributes will have:
+
+```js
+const schema = new Schema({
+    /***/
+}, {
+    timestamps: {
+        createdAt: "creationDate",
+        updatedAt: "lastUpdateDate"
+    }
 });
 ```
 
 ### Attribute Types
 
-Attribute Types define the domain of a particular attribute. For example, a `name` might be set to `String` or `age` to `Number`. 
+Attribute Types define the domain of a particular attribute. For example, a `name` might be set to `String`, or `age` to `Number`.
 
 The following table describes valid Attribute Types, and their translation to DynamoDB types:
 
@@ -203,164 +299,124 @@ The following table describes valid Attribute Types, and their translation to Dy
 |:--------------:|:-----------------------:|
 | String         | 'S'                     |
 | Number         | 'N'                     |
-| Boolean        | 'S'                     |
-| Date           | 'N'                     |
-| Object         | 'S'                     |
-| Array          | 'S'                     |
+| Boolean        | 'BOOL'                  |
+| Date           | 'S'                     |
+| Object         | 'M'                     |
+| Array          | 'L'                     |
 | Buffer         | 'B'                     |
 | [String]       | 'SS'                    |
 | [Number]       | 'NS'                    |
 | [Boolean]      | 'SS'                    |
-| [Date]         | 'NS'                    |
-| [Object]       | 'SS'                    |
-| [Array]        | 'SS'                    |
-
-_**: Use the useNativeBooleans flag to store Boolean values as 'BOOL'_
+| [Date]         | 'SS'                    |
 
 ### Attribute Definitions
 
 Attribute definitions define constraints on a particular attribute specified in a Schema. Attribute definitions may be an object type (see [Attribute Types](#attribute-types)) or an object with the following options:
 
-**type**: AttributeType _required_
+- **type**: `AttributeType` _required_
 
-Required for all attribute definitions. Defines the attribute type. See [Attribute Types](#attribute-types).
+  Required for all attribute definitions. Defines the attribute type. See [Attribute Types](#attribute-types).
 
-**hashKey**: boolean
+- **hashKey**: `Boolean`
 
-Sets the attribute as the table's hash key. If this option isn't specified in a schema, then the first attribute is defined as the hash key.
+  Sets the attribute as the table's hash key. If this option isn't specified in a schema, then the first attribute is defined as the hash key.
 
-**rangeKey**: boolean
+- **rangeKey**: `Boolean`
 
-Sets the attribute as the table's range key.
+  Sets the attribute as the table's range key.
 
-**required**: boolean
+- **required**: `Boolean`
 
-Sets the attribute as a 'required' attribute. Required attributes must not be saved as undefined or null, or an error will be thrown.
+  Sets the attribute as a 'required' attribute. Required attributes must not be saved as `undefined` or `null`, or an error will be thrown.
 
-**index**: boolean or object
+- **index**: `Boolean` | `Object` (or an array of those types)
 
-Defines the attribute as a local or global secondary index. Index can either be true or an index definition object. The index definition object can contain the following keys:
+  Defines the attribute as a local or global secondary index. Index can either be true or an index definition object. The index definition object can contain the following keys:
 
-- _name: 'string'_ - Name of index (Default is `attribute.name + (global ? 'GlobalIndex' : 'LocalIndex')``).
-- _global: boolean_ - Set the index to be a global secondary index.  Attribute will be the hash key for the Index.
-- _rangeKey: 'string'_ - The range key for a global secondary index.
-- _project: boolean | ['string', ...]_ - Sets the attributes to be projected for the index.  `true` projects all attributes, `false` projects only the key attributes, and ['string', ...] projects the attributes listed. Default is `true`.
-- _throughput: number | {read: number, write: number}_ - Sets the throughput for the global secondary index.
-- _useNativeBooleans: boolean_ - Later versions of Dynamo added support for Boolean attributes. Set to true to add support for Boolean values that aren't stored as strings.
+  - **name**: `String`
 
-**default**: function | value
+    Name of index (Default is `attribute.name + (global ? 'GlobalIndex' : 'LocalIndex')``).
 
-Applies a default to the attribute's value when saving, if the values is null or undefined.
+  - **global**: `Boolean`
 
-If default is a function, the function is called, and the response is assigned to the attribute's value.
+    Set the index to be a global secondary index.  Attribute will be the hash key for the Index.
 
-If it is a value, the value is simply assigned.
+  - **rangeKey**: `String`
 
-**validate**: function, regular expression, or value
+    The range key for a global secondary index.
 
-Validation required before for saving.
+  - **project**: `Boolean` | `[String, ...]`
 
-If validate is a function, the function is used to validate the attribute's value. The function must have the signature:
+    Sets the attributes to be projected for the index.  `true` projects all attributes, `false` projects only the key attributes, and ['string', ...] projects the attributes listed. Default is `true`.
 
-```js
-function(value) {
-  if(valid)
-    return true;
-  else
-    return false;
-}
-```
+  - **throughput**: `Number` | `{ read: Number, write: Number }` (numbers must be intergers)
 
-If it is a RegExp, it is compared using `RegExp.text(value)`.
+    Sets the throughput for the global secondary index.
 
-If it is a value, it is compared with `===`.
+- **default**: `Function` | *value*
 
-**set**: function
+  Applies a default to the attribute's value when saving, if the value is `null` or `undefined`. If `default` is a function, the function is called, and the response is assigned to the attribute's value. If it is a value, the value is simply assigned.
 
-Adds a setter function that will be used to transform the value before writing to the DB.
+- **validate**: `Function` | `RegExp` | *value*
 
-**get**: function
+  Validation required before for saving. If `validate` is a function, the function is used to validate the attribute's value. This function must have the signature:
 
-Adds a getter function that will be used to transform the value returned from the DB.
+  ```js
+  function (value) {
+    if (valid)
+      return true;
+    else
+      return false;
+  }
+  ```
 
-**trim**: boolean
+  If it is a `RegExp`, it is compared using `RegExp.text(value)`. Otherwise, it is compared with `===`.
 
-Trim whitespace from string when saving to DB.
+- **set**: `Function`
 
-**lowercase**: boolean
+  Adds a setter function that will be used to transform the value before writing to the DB.
 
-Convert to lowercase when saving to DB.
+- **get**: `Function`
 
-**uppercase**: boolean
+  Adds a getter function that will be used to transform the value returned from the DB.
 
-Convert to uppercase when saving to DB.
+- **trim**: `Boolean`
 
-### Options
+  Trim whitespace from string when saving to DB.
 
-**throughput**: number | {read: number, write: number}
+- **lowercase**: `Boolean`
 
-Sets the throughput of the DynamoDB table. The value can either be a number or an object with the keys `read` and `write` (for example: `{read: 5, write: 2}`). If it is a number, both read and write are configured to that number. If it is omitted, the read and write values will be set to 1.
+  Convert to lowercase when saving to DB.
 
-```js
-var schema = new Schema({...}, { throughput: 5 });
-var schema = new Schema({...}, { throughput: { read: 5, write: 2 } });
-```
+- **uppercase**: `Boolean`
 
-**timestamps**: boolean | {createdAt: string, updatedAt: string}
+  Convert to uppercase when saving to DB.
 
-Defines that _schema_ must contain fields to control creation and last update timestamps. If it is set to true, this fields will be createdAt for creation date and updatedAt for last update. for example:
-
-```js
-var schema = new Schema({...}, { throughput: 5, timestamps: true});
-```
-
-Also it is possible to specify wich names that field will use, like in the following example:
-
-```js
-var schema = new Schema({...}, { throughput: 5, timestamps: {createdAt: 'creationDate', updatedAt: 'lastUpdateDate'});
-```
+------
 
 ## Model API
 
 ```js
-var Dog = dynamoose.model('Dog', dogSchema);
+const Dog = dynamoose.model("Dog", DogSchema);
 ```
 
-#### new Model(object)
+#### `new <Model>(object)`
 
-Creates a new instance of the model. Object keys are assigned to the new model.
+Creates a new instance of the model.
 
 ```js
-var odie = new Dog({
-  ownerId: 4,
-  name: 'Odie',
-  breed: 'Beagle',
-  color: ['Tan'],
-  cartoon: true
+let odie = new Dog({
+    ownerId: 4,
+    name: 'Odie',
+    breed: 'Beagle',
+    color: ['Tan'],
+    cartoon: true
 });
 ```
 
-#### model.put(options, callback) & model.save(options, callback)
+### Static methods
 
-Puts the item in the DynamoDB table.  Will overwrite the item.
-
-```js
-odie.save(function (err) {
-  if(err) { return console.log(err); }
-  console.log('Ta-da!');
-});
-
-odie.save({
-    condition: '#o = :ownerId',
-    conditionNames: { o: 'ownerId' },
-    conditionValues: { ownerId: 4 }
-  }, function (err) {
-  if(err) { return console.log(err); }
-  console.log('Ta-da!');
-});
-```
-
-#### Model.batchPut(items, options, callback)
+#### `<Model>.batchPut(items, options, callback)`
 
 Puts multiple items in the table. Will overwrite existing items.
 
@@ -401,27 +457,23 @@ Dog.batchPut([
 
 ##### Options
 
-**overwrite**: boolean
+ - **overwrite**: `Boolean`
 
-Overwrite existing item. Defaults to true.
+  Overwrite existing item. Defaults to true.
 
-**condition**: string
+- **condition**: `String`
 
-An expression for a conditional update. See
-[the AWS documentation](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.SpecifyingConditions.html)
-for more information about condition expressions.
+  An expression for a conditional update. See [the AWS documentation](http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.SpecifyingConditions.html) for more information about condition expressions.
 
-**conditionNames**: object
+- **conditionNames**: `Object`
 
-A map of name substitutions for the condition expression.
+  A map of name substitutions for the condition expression.
 
-**conditionValues**: object
+- **conditionValues**: `Object`
 
-A map of values for the condition expression. Note that in order for
-automatic object conversion to work, the keys in this object must
-match schema attribute names.
+  A map of values for the condition expression. Note that in order for automatic object conversion to work, the keys in this object must match schema attribute names.
 
-#### Model.create(object, options, callback)
+#### `<Model>.create(object, options, callback)`
 
 Creates a new instance of the model and save the item in the table.
 
@@ -438,7 +490,7 @@ Dog.create({
 });
 ```
 
-#### Model.get(key, options, callback)
+#### `<Model>.get(key, options, callback)`
 
 Gets an item from the table.
 
@@ -449,7 +501,7 @@ Dog.get({ownerId: 4, name: 'Odie'}, function(err, odie) {
 });
 ```
 
-#### Model.batchGet(keys, options, callback)
+#### `<Model>.batchGet(keys, options, callback)`
 
 Gets multiple items from the table.
 
@@ -460,7 +512,7 @@ Dog.batchGet([{ownerId: 4, name: 'Odie'}, {ownerId: 5, name: 'Lassie'}], functio
 });
 ```
 
-#### Model.delete(key, options, callback)
+#### `<Model>.delete(key, options, callback)`
 
 Deletes an item from the table.
 
@@ -471,18 +523,7 @@ Dog.delete({ownerId: 4, name: 'Odie'}, function(err) {
 });
 ```
 
-#### model.delete(callback)
-
-Deletes the item from the table.
-
-```js
-odie.delete(function(err) {
-  if(err) { return console.log(err); }
-  console.log('Bye bye Odie');
-});
-```
-
-#### Model.batchDelete(keys, options, callback)
+#### `<Model>.batchDelete(keys, options, callback)`
 
 Deletes multiple items from the table.
 
@@ -498,81 +539,116 @@ Dog.batchDelete([
 });
 ```
 
-#### Model.query(query, options, callback)
+#### `<Model>.query(query, options, [callback])`
 
-Queries a table or index.  If callback is not provided, then a Query object is returned. See [Query](#query).
+Queries a table or index.  If `callback` is not provided, then a `Query` object is returned. See [Query](#query).
 
-#### Model.queryOne(query, options, callback)
+#### `<Model>.queryOne(query, options, callback)`
 
-Same functionality as query except only return the first result object (if any). See [Query](#query).
+Same functionality as `<Model>.query` except it only returns the first result (if any). See [Query](#query).
 
-#### Model.scan(filter, options, callback)
+#### `<Model>.scan(filter, options, [callback])`
 
-Scans a table. If callback is not provided, then a Scan object is returned. See [Scan](#scan).
+Scans a table. If `callback` is not provided, then a `Scan` object is returned. See [Scan](#scan).
 
-#### Model.update(key, update, options, callback)
+#### `<Model>.update(key, update, options, callback)`
 
-Updates and existing item in the table. Three types of updates: $PUT, $ADD, and $DELETE.
+Updates and existing item in the table. There are three types of updates:
 
-**$PUT**
+- `$PUT`
 
-Put is the default behavior.  The two example below are identical.
+  Put is the default behavior.  The two example below are identical.
 
-```js
-Dog.update({ownerId: 4, name: 'Odie'}, {age: 1}, function (err) {
-  if(err) { return console.log(err); }
-  console.log('Just a puppy');
-})
-```
+  ```js
+  Dog.update({ownerId: 4, name: 'Odie'}, {age: 1}, function (err) {
+    if(err) { return console.log(err); }
+    console.log('Just a puppy');
+  })
+  ```
 
-```js
-Dog.update({ownerId: 4, name: 'Odie'}, {$PUT: {age: 1}}, function (err) {
-  if(err) { return console.log(err); }
-  console.log('Just a puppy');
-})
-```
+  ```js
+  Dog.update({ownerId: 4, name: 'Odie'}, {$PUT: {age: 1}}, function (err) {
+    if(err) { return console.log(err); }
+    console.log('Just a puppy');
+  })
+  ```
 
-**$ADD**
+- `$ADD`
 
-Adds one or more attributes to the item.
+  Adds one or more attributes to the item.
 
-```js
-Dog.update({ownerId: 4, name: 'Odie'}, {$ADD: {age: 1}}, function (err) {
-  if(err) { return console.log(err); }
-  console.log('Birthday boy');
-})
-```
+  ```js
+  Dog.update({ownerId: 4, name: 'Odie'}, {$ADD: {age: 1}}, function (err) {
+    if(err) { return console.log(err); }
+    console.log('Birthday boy');
+  })
+  ```
 
-**$DELETE**
+- `$DELETE`
 
-Removes one or more attributes from an item.
+  Removes one or more attributes from an item.
 
-```js
-Dog.update({ownerId: 4, name: 'Odie'}, {$DELETE: {age: null}}, function (err) {
-  if(err) { return console.log(err); }
-  console.log('Too old to keep count');
-})
-```
+  ```js
+  Dog.update({ownerId: 4, name: 'Odie'}, {$DELETE: {age: null}}, function (err) {
+    if(err) { return console.log(err); }
+    console.log('Too old to keep count');
+  })
+  ```
 
 ##### Options
 
-**allowEmptyArray**: boolean
+- **allowEmptyArray**: `Boolean`
 
-If true, the attribute can be updated to an empty array. If false, empty arrays will remove the attribute. Defaults to false.
+  If `true`, the attribute can be updated to an empty array. Otherwise, empty arrays will remove the attribute. Defaults to `false`.
 
-**createRequired**: boolean
+- **createRequired**: `Boolean`
 
-If true, required attributes will be filled with their default values on update (regardless of you specifying them for the update). Defaults to false.
+  If `true`, required attributes will be filled with their default values on update (regardless of you specifying them for the update). Defaults to `false`.
 
-**updateTimestamps**: boolean
+- **updateTimestamps**: `Boolean`
 
-If true, the `timestamps` attributes will be updated. Will not do anything if timestamps attribute were not specified. Defaults to true.
+  If `true`, the `timestamps` attributes will be updated. Will not do anything if `timestamps` attribute were not specified. Defaults to `true`.
 
-## Query
+### Instance methods
 
-#### Model.query(query, options, callback)
+#### `<item>.put(options, callback)` and `<item>.save(options, callback)`
 
-Queries a table or index. The query parameter can either the the hash key of the table or global index or a complete query object. If the callback is provided, the exec command is called automatically, and the query parameter must be a query object.
+Stores the item in the DynamoDB table, overwritting existing data.
+
+```js
+odie.save(function (err) {
+  if(err) { return console.log(err); }
+  console.log('Ta-da!');
+});
+
+odie.save({
+    condition: '#o = :ownerId',
+    conditionNames: { o: 'ownerId' },
+    conditionValues: { ownerId: 4 }
+  }, function (err) {
+  if(err) { return console.log(err); }
+  console.log('Ta-da!');
+});
+```
+
+#### `<item>.delete(callback)`
+
+Deletes the item from the table.
+
+```js
+odie.delete(function(err) {
+  if(err) { return console.log(err); }
+  console.log('Bye bye Odie');
+});
+```
+
+------
+
+## Query API
+
+#### `<Model>.query(query, options, [callback])`
+
+Queries a table or index. The `query` parameter can either the the hash key of the table or global index or a complete query object. If `callback` is provided, the `<query>.exec` method is called automatically, and the `query` parameter must be a query object.
 
 ```js
 Dog.query('breed').eq('Beagle').exec(function (err, dogs) {
@@ -586,103 +662,103 @@ Dog.query({breed: {eq: 'Beagle'} }, function (err, dogs) {
 });
 ```
 
-#### query.exec(callback)
+#### `<query>.exec(callback)`
 
 Executes the query against the table or index.
 
-#### query.where(rangeKey)
+#### `<query>.where(rangeKey)`
 
 Set the range key of the table or index to query.
 
-#### query.filter(filter)
+#### `<query>.filter(filter)`
 
 Set the attribute on which to filter.
 
-#### query.and()
+#### `<query>.and()`
 
 Use add logic for filters.
 
-#### query.or()
+#### `<query>.or()`
 
 Use or logic for filters.
 
-#### scan.not()
+#### `<query>.not()`
 
 Inverts the filter logic that follows.
 
-#### scan.null()
+#### `<query>.null()`
 
 Filter attribute for null.
 
-#### query.eq(value)
+#### `<query>.eq(value)`
 
 Hash, range key, or filter must equal the value provided. This is the only comparison option allowed for a hash key.
 
-#### query.lt(value)
+#### `<query>.lt(value)`
 
 Range key or filter less than the value.
 
-#### query.le(value)
+#### `<query>.le(value)`
 
 Range key or filter less than or equal value.
 
-#### query.ge(value)
+#### `<query>.ge(value)`
 
 Range key or filter greater than or equal value.
 
-#### query.gt(value)
+#### `<query>.gt(value)`
 
 Range key or filter greater than the value.
 
-#### query.beginsWith(value)
+#### `<query>.beginsWith(value)`
 
 Range key or filter begins with value
 
-#### query.between(a, b)
+#### `<query>.between(a, b)`
 
 Range key or filter is greater than or equal `a`. and less than or equal to `b`.
 
-#### scan.contains(value)
+#### `<query>.contains(value)`
 
 Filter contains the value.
 
-#### scan.beginsWith(value)
+#### `<query>.beginsWith(value)`
 
 Filter begins with the value.
 
-#### scan.in(values)
+#### `<query>.in(values)`
 
 Filter is in values array.
 
-#### query.limit(limit)
+#### `<query>.limit(limit)`
 
 The maximum number of items to evaluate (not necessarily the number of matching items). If DynamoDB processes the number of items up to the limit while processing the results, it stops the operation and returns the matching values up to that point, and a key in `lastKey` to apply in a subsequent operation, so that you can pick up where you left off. Also, if the processed data set size exceeds 1 MB before DynamoDB reaches this limit, it stops the operation and returns the matching values up to the limit, and a key in `lastKey` to apply in a subsequent operation to continue the operation. For more information, see Query and Scan in the Amazon DynamoDB Developer Guide.
 
-#### query.consistent()
+#### `<query>.consistent()`
 
 Query with consistent read.
 
-#### query.descending()
+#### `<query>.descending()`
 
 Sort in descending order.
 
-#### query.ascending()
+#### `<query>.ascending()`
 
 Sort in ascending order (default).
 
-#### query.startAt(key)
+#### `<query>.startAt(key)`
 
-Start query at key. Use `lastKey` returned in query.exec() callback.
+Start query at key. Use `lastKey` returned in `query.exec()` callback.
 
-#### query.attributes(attributes)
+#### `<query>.attributes(attributes)`
 
 Set the list of attributes to return.
 
-#### query.count()
+#### `<query>.count()`
 
 Return the number of matching items, rather than the matching items themselves.
 
-#### query.counts()
+#### `<query>.counts()`
 
 Return the counts objects of matching items, rather than the matching items themselves:
 
@@ -695,11 +771,13 @@ Return the counts objects of matching items, rather than the matching items them
 
 If you used a filter in the request, then `count` is the number of items returned after the filter was applied, and `scannedCount` is the number of matching items before the filter was applied.
 
-## Scan
+------
 
-#### Model.scan(filter, options, callback)
+## Scan API
 
-Scans a table. The optional filter parameter can either be an attribute of the table or a complete filter object. If the callback is provided, the exec command is called automatically, and the scan parameter must be a Scan object.
+#### `<Model>.scan(filter, options, [callback])`
+
+Scans a table. The optional `filter` parameter can either be an attribute of the table or a complete filter object. If `callback` is provided, the `exec` method is called automatically, and the `scan` parameter must be a `Scan` object.
 
 ```js
 Dog.scan('breed').contains('Terrier').exec(function (err, dogs) {
@@ -726,79 +804,79 @@ Dog.scan().exec(function (err, dogs) {
 });
 ```
 
-#### scan.exec(callback)
+#### `<scan>.exec(callback)`
 
-Executes a scan against a table
+Executes a scan against a table.
 
-#### scan.and()
+#### `<scan>.and()`
 
-For readability only. Scans us AND logic for multiple attributes.  `and()` does not provide any functionality and can be omitted.
+For readability only. Scans already use `AND` logic for multiple attributes. `<scan>.and` does not provide any functionality and can be omitted.
 
-#### scan.where(filter) | scan.filter(filter)
+#### `<scan>.where(filter)` and `scan.filter(filter)`
 
 Add additional attribute to the filter list.
 
-#### scan.not()
+#### `<scan>.not()`
 
 Inverts the filter logic that follows.
 
-#### scan.null()
+#### `<scan>.null()`
 
 Scan attribute for null.
 
-#### scan.eq(value)
+#### `<scan>.eq(value)`
 
 Attribute is equal to the value.
 
-#### scan.lt(value)
+#### `<scan>.lt(value)`
 
 Attribute is less than the value.
 
-#### scan.le(value)
+#### `<scan>.le(value)`
 
 Attribute is less than or equal value.
 
-#### scan.ge(value)
+#### `<scan>.ge(value)`
 
 Attribute is greater than or equal value.
 
-#### scan.gt(value)
+#### `<scan>.gt(value)`
 
 Attribute is greater than the value.
 
-#### scan.contains(value)
+#### `<scan>.contains(value)`
 
 Attribute contains the value.
 
-#### scan.beginsWith(value)
+#### `<scan>.beginsWith(value)`
 
 Attribute begins with the value.
 
-#### scan.in(values)
+#### `<scan>.in(values)`
 
 Attribute is in values array.
 
-#### scan.between(a, b)
+#### `<scan>.between(a, b)`
 
 Attribute value is greater than or equal `a`. and less than or equal to `b`.
 
-#### scan.limit(limit)
+#### `<scan>.limit(limit)`
 
 The maximum number of items to evaluate (not necessarily the number of matching items). If DynamoDB processes the number of items up to the limit while processing the results, it stops the operation and returns the matching values up to that point, and a key in `lastKey` to apply in a subsequent operation, so that you can pick up where you left off. Also, if the processed data set size exceeds 1 MB before DynamoDB reaches this limit, it stops the operation and returns the matching values up to the limit, and a key in `lastKey` to apply in a subsequent operation to continue the operation. For more information, see Query and Scan in the Amazon DynamoDB Developer Guide.
 
-#### scan.startAt(key)
+#### `<scan>.startAt(key)`
 
-Start scan at key. Use `lastKey` returned in `scan.exec()` callback.
+Start scan at key. Use `lastKey` returned in `<scan>.exec()` callback.
 
-#### scan.attributes(attributes)
+#### `<scan>.attributes(attributes)`
 
 Set the list of attributes to return.
 
-#### scan.count()
+#### `<scan>.count()`
 
 Return the number of matching items, rather than the matching items themselves.
 
-#### scan.counts()
+#### `<scan>.counts()`
 
 Return the counts objects of matching items, rather than the matching items themselves:
 
@@ -810,5 +888,3 @@ Return the counts objects of matching items, rather than the matching items them
 ```
 
 If you used a filter in the scan, then `count` is the number of items returned after the filter was applied, and `scannedCount` is the number of matching items before the filter was applied.
-
-

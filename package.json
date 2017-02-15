@@ -1,6 +1,6 @@
 {
   "name": "@treblefm/dynamoose",
-  "version": "0.7.0",
+  "version": "1.0.0-alpha",
   "description": "Dynamoose is a modeling tool for Amazon's DynamoDB (inspired by Mongoose)",
   "homepage": "https://github.com/TrebleFM/dynamoose",
   "main": "index.js",
