@@ -25,10 +25,12 @@ Highlights of differences:
         // do things
     });
     ```
+- Dropped support for DynamoDB Lists (`L`)
+  - Kind of. Arrays of objects will be stored as `L`, since there is no Map Set type
 - Booleans are always stored as `BOOL` instead of `S`
-- Objects and arrays are always stored as `M` and `L`, respectively
+- Objects are always stored as `M` instead of stringified JSON as `S`
 - Dates are stored as `S` instead of `N` in ISO-8601 format, to conform with the official DynamoDB high-level interfaces
-- Some smaller differences in behavior which shouldn't be a problem, but still count as breaking changes
+- Some smaller differences in behavior (option handling, argument validation, etc.) which *probably* won't be a problem...
 
 ## Getting Started
 
@@ -166,6 +168,10 @@ dynamoose.AWS.config.update({
 });
 ```
 
+### `dynamoose.Buffer`
+
+Due to security issues with `Buffer` in versions of Node before v6, Dynamoose uses the [`safe-buffer`](https://www.npmjs.com/package/safe-buffer) package internally. It is exposed here for your use.
+
 ### `dynamoose.Schema`
 
 The dynamoose `Schema` class, used to create new schema definitions. For example:
@@ -297,17 +303,19 @@ The following table describes valid Attribute Types, and their translation to Dy
 
 | Attribute Type | Resulting DynamoDB Type |
 |:--------------:|:-----------------------:|
-| String         | 'S'                     |
-| Number         | 'N'                     |
-| Boolean        | 'BOOL'                  |
-| Date           | 'S'                     |
-| Object         | 'M'                     |
-| Array          | 'L'                     |
-| Buffer         | 'B'                     |
-| [String]       | 'SS'                    |
-| [Number]       | 'NS'                    |
-| [Boolean]      | 'SS'                    |
-| [Date]         | 'SS'                    |
+| `Boolean`      | 'BOOL'                  |
+| `String`       | 'S'                     |
+| `Number`       | 'N'                     |
+| `Date`         | 'S'                     |
+| `Object`       | 'M'                     |
+| `Buffer`       | 'B'                     |
+|                |                         |
+| `[Boolean]`    | *n/a*                   |
+| `[String]`     | 'SS'                    |
+| `[Number]`     | 'NS'                    |
+| `[Date]`       | 'SS'                    |
+| `[Object]`     | 'L'                     |
+| `[Buffer]`     | 'BS'                    |
 
 ### Attribute Definitions
 

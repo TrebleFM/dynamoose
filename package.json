@@ -50,6 +50,7 @@
     "extendable-error-class": "^0.1.1",
     "hooks-fixed": "^1.2.0",
     "q": "^1.4.1",
+    "safe-buffer": "^5.0.1",
     "underscore": "^1.8.3"
   }
 }
